@@ -1,4 +1,4 @@
-# 켄트 벡의 핵심 원칙
+# TDD와 작은 리팩토링 핵심 원칙
 
 ## 1. TDD (Test-Driven Development)
 
@@ -42,7 +42,7 @@
 
 ## 2. 단순한 설계의 4가지 규칙
 
-켄트 벡이 정의한 "단순한 설계"의 우선순위:
+"단순한 설계"의 우선순위:
 
 ### 1순위: 테스트 통과
 모든 테스트가 통과해야 함. 이것이 가장 기본.
@@ -50,15 +50,15 @@
 ### 2순위: 의도 드러내기
 코드를 읽는 사람이 의도를 바로 이해할 수 있어야 함.
 
-```swift
+```
 // Bad: 의도가 불명확
-func process(_ items: [Int]) -> [Int] {
-    items.filter { $0 % 2 == 0 }
+func process(_ items) {
+    return filter(items, isEven)
 }
 
 // Good: 의도가 명확
-func filterEvenNumbers(_ numbers: [Int]) -> [Int] {
-    numbers.filter { $0.isEven }
+func filterEvenNumbers(_ numbers) {
+    return filter(numbers, isEven)
 }
 ```
 
@@ -73,7 +73,7 @@ func filterEvenNumbers(_ numbers: [Int]) -> [Int] {
 ## 3. 리팩토링 원칙
 
 ### 행동 보존
-> "리팩토링은 외부 동작을 바꾸지 않으면서 내부 구조를 개선하는 것"
+리팩토링은 외부 동작을 바꾸지 않으면서 내부 구조를 개선하는 것이다.
 
 - 리팩토링 전후로 테스트 결과가 동일해야 함
 - 기능 추가와 리팩토링을 동시에 하지 않음
@@ -86,7 +86,7 @@ func filterEvenNumbers(_ numbers: [Int]) -> [Int] {
 각 작은 변경 후:
 1. 테스트 실행
 2. 통과 확인
-3. 커밋 (선택적)
+3. 변경 기록 남기기 (선택적)
 
 ### 리팩토링 시점
 
@@ -104,24 +104,23 @@ func filterEvenNumbers(_ numbers: [Int]) -> [Int] {
 
 ## 4. YAGNI (You Aren't Gonna Need It)
 
-> "실제로 필요할 때까지 기능을 추가하지 마라"
+실제로 필요할 때까지 기능을 추가하지 않는다.
 
 ### 적용 예시
 
-```swift
+```
 // Bad: 미래를 위한 과도한 추상화
-protocol DataSourceProtocol {
-    associatedtype Item
-    func fetch() async throws -> [Item]
-    func cache(_ items: [Item])
+protocol DataSource {
+    func fetch()
+    func cache(items)
     func invalidateCache()
-    func prefetch(ids: [String])
-    // ... 10개의 더 많은 메서드
+    func prefetch(ids)
+    // ... 많은 추가 메서드
 }
 
 // Good: 현재 필요한 것만
 protocol DataFetching {
-    func fetch() async throws -> [Item]
+    func fetch()
 }
 ```
 
@@ -136,7 +135,7 @@ YAGNI는 "설계하지 마라"가 아님:
 ## 5. 점진적 개선
 
 ### 보이스카우트 규칙
-> "캠프장을 떠날 때는 도착했을 때보다 더 깨끗하게"
+수정 후 코드는 들어왔을 때보다 더 깨끗해야 한다.
 
 코드를 수정할 때:
 - 작은 개선 하나씩 추가
@@ -162,15 +161,19 @@ YAGNI는 "설계하지 마라"가 아님:
 
 ### 코드는 문서다
 
-```swift
+```
 // 주석이 필요한 코드 = 개선이 필요한 코드
 
 // Bad
 // 사용자가 성인인지 확인
-if user.age >= 18 { ... }
+if user.age >= 18 {
+    ...
+}
 
 // Good
-if user.isAdult { ... }
+if user.isAdult {
+    ...
+}
 ```
 
 ### 이름 짓기 원칙

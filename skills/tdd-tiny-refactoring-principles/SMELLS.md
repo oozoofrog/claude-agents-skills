@@ -14,19 +14,19 @@
 - Replace Temp with Query: 임시 변수를 메서드 호출로 대체
 - Decompose Conditional: 조건문을 설명적인 메서드로 분리
 
-```swift
+```
 // Before
-func processOrder(_ order: Order) {
+func processOrder(_ order) {
     // 50줄의 코드...
     // 유효성 검사, 재고 확인, 결제 처리, 배송 준비 등
 }
 
 // After
-func processOrder(_ order: Order) {
+func processOrder(_ order) {
     validate(order)
-    checkInventory(for: order)
-    processPayment(for: order)
-    prepareShipment(for: order)
+    checkInventory(order)
+    processPayment(order)
+    prepareShipment(order)
 }
 ```
 
@@ -50,12 +50,16 @@ func processOrder(_ order: Order) {
 ### Primitive Obsession (기본 타입에 대한 집착)
 **증상**: 도메인 개념을 기본 타입으로 표현
 
-```swift
+```
 // Before
-func createUser(email: String, age: Int, phone: String)
+func createUser(email, age, phone) {
+    ...
+}
 
 // After
-func createUser(email: Email, age: Age, phone: PhoneNumber)
+func createUser(email: Email, age: Age, phone: PhoneNumber) {
+    ...
+}
 ```
 
 **해결책**:
@@ -72,13 +76,16 @@ func createUser(email: Email, age: Age, phone: PhoneNumber)
 - Preserve Whole Object: 객체에서 여러 값을 꺼내지 말고 객체 자체를 전달
 - Replace Parameter with Method: 파라미터를 메서드 호출로 대체
 
-```swift
+```
 // Before
-func createReport(startDate: Date, endDate: Date, format: String,
-                  includeCharts: Bool, emailTo: String)
+func createReport(startDate, endDate, format, includeCharts, emailTo) {
+    ...
+}
 
 // After
-func createReport(config: ReportConfiguration)
+func createReport(config) {
+    ...
+}
 ```
 
 ---
@@ -93,23 +100,30 @@ func createReport(config: ReportConfiguration)
 - Replace Type Code with Strategy
 - Replace Type Code with State
 
-```swift
+```
 // Before
-func calculatePay(_ employee: Employee) -> Double {
+func calculatePay(_ employee) {
     switch employee.type {
-    case .engineer: return engineerPay(employee)
-    case .salesman: return salesmanPay(employee)
-    case .manager: return managerPay(employee)
+    case "engineer":
+        return engineerPay(employee)
+    case "salesman":
+        return salesmanPay(employee)
+    case "manager":
+        return managerPay(employee)
+    default:
+        return 0
     }
 }
 
 // After
 protocol Employee {
-    func calculatePay() -> Double
+    func calculatePay()
 }
 
 class Engineer: Employee {
-    func calculatePay() -> Double { ... }
+    func calculatePay() {
+        ...
+    }
 }
 ```
 
@@ -167,19 +181,23 @@ class Engineer: Employee {
 ### Comments (주석)
 **증상**: 코드를 설명하기 위한 주석이 많음
 
-> "주석이 필요하다고 느낄 때, 먼저 코드를 리팩토링해서 주석이 불필요하게 만들어라" - 마틴 파울러
+주석이 필요하다고 느낄 때, 먼저 코드를 리팩토링해 주석이 불필요해지도록 한다.
 
 **해결책**:
 - Extract Function: 주석이 설명하는 코드를 메서드로 추출
 - Rename: 의도를 드러내는 이름으로 변경
 
-```swift
+```
 // Before
 // 사용자가 프리미엄 회원이고 구매 금액이 10만원 이상인지 확인
-if user.membershipType == "premium" && order.total >= 100000 { ... }
+if user.membershipType == "premium" && order.total >= 100000 {
+    ...
+}
 
 // After
-if user.isPremium && order.qualifiesForFreeShipping { ... }
+if user.isPremium && order.qualifiesForFreeShipping {
+    ...
+}
 ```
 
 ---
@@ -208,7 +226,7 @@ if user.isPremium && order.qualifiesForFreeShipping { ... }
 ### Dead Code (죽은 코드)
 **증상**: 더 이상 사용되지 않는 코드
 
-**해결책**: 삭제. 버전 관리 시스템이 있으니 걱정 말고 삭제.
+**해결책**: 삭제. 변경 이력이 있으니 걱정 말고 삭제.
 
 ---
 
@@ -227,10 +245,10 @@ if user.isPremium && order.qualifiesForFreeShipping { ... }
 ### Feature Envy (기능 편애)
 **증상**: 메서드가 자신의 클래스보다 다른 클래스의 데이터를 더 많이 사용
 
-```swift
+```
 // Before: Order가 Customer의 데이터에 지나치게 의존
 class Order {
-    func calculateDiscount() -> Double {
+    func calculateDiscount() {
         if customer.membershipYears > 5 &&
            customer.totalPurchases > 1000000 &&
            customer.isPremium {
@@ -242,7 +260,7 @@ class Order {
 
 // After: 계산 로직을 Customer로 이동
 class Customer {
-    func discountRate() -> Double {
+    func discountRate() {
         if membershipYears > 5 && totalPurchases > 1000000 && isPremium {
             return 0.2
         }
