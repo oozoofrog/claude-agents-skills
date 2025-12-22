@@ -3,17 +3,35 @@
 # Claude agents/skills 동기화 스크립트
 # 프로젝트 <-> ~/.claude 간 agents와 skills 동기화
 
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 스크립트 디렉토리 확인
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || {
+    echo "오류: 스크립트 디렉토리 확인 실패" >&2
+    exit 1
+}
+
+# HOME 환경변수 검증
+if [[ -z "${HOME:-}" ]]; then
+    echo "오류: HOME 환경변수가 설정되지 않음" >&2
+    exit 1
+fi
 HOME_CLAUDE="$HOME/.claude"
 
-# 색상 정의
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# 터미널 색상 지원 확인
+if [[ -t 1 ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 print_usage() {
     echo -e "${BLUE}사용법:${NC} $0 [pull|push] [--dry-run]"
@@ -36,12 +54,12 @@ check_directories() {
     local source_skills="$2"
 
     if [[ ! -d "$source_agents" ]]; then
-        echo -e "${RED}오류:${NC} $source_agents 디렉토리가 없습니다."
+        echo -e "${RED}오류:${NC} $source_agents 디렉토리가 없습니다." >&2
         exit 1
     fi
 
     if [[ ! -d "$source_skills" ]]; then
-        echo -e "${RED}오류:${NC} $source_skills 디렉토리가 없습니다."
+        echo -e "${RED}오류:${NC} $source_skills 디렉토리가 없습니다." >&2
         exit 1
     fi
 }
@@ -64,12 +82,38 @@ sync_directories() {
 
     if [[ "$dry_run" == "true" ]]; then
         echo -e "  ${YELLOW}(dry-run) 복사될 파일:${NC}"
-        find "$source_agents" -type f -name "*.md" | while read -r file; do
+        local found_agents=0
+        while IFS= read -r file; do
             echo "    - $(basename "$file")"
-        done
+            found_agents=1
+        done < <(find "$source_agents" -type f -name "*.md" 2>&1) || {
+            echo -e "    ${RED}오류: 파일 목록 조회 실패${NC}" >&2
+        }
+        if [[ $found_agents -eq 0 ]]; then
+            echo "    (복사할 .md 파일 없음)"
+        fi
     else
-        mkdir -p "$dest_agents"
-        cp -Rv "$source_agents"/*.md "$dest_agents/" 2>/dev/null || echo "  (복사할 .md 파일 없음)"
+        if ! mkdir -p "$dest_agents"; then
+            echo -e "${RED}오류:${NC} 디렉토리 생성 실패: $dest_agents" >&2
+            exit 1
+        fi
+
+        # nullglob으로 빈 glob 처리
+        shopt -s nullglob
+        local md_files=("$source_agents"/*.md)
+        shopt -u nullglob
+
+        if [[ ${#md_files[@]} -eq 0 ]]; then
+            echo "  (복사할 .md 파일 없음)"
+        else
+            for md_file in "${md_files[@]}"; do
+                echo "  복사 중: $(basename "$md_file")"
+                if ! cp -v "$md_file" "$dest_agents/"; then
+                    echo -e "${RED}오류:${NC} 파일 복사 실패: $md_file" >&2
+                    exit 1
+                fi
+            done
+        fi
     fi
 
     echo ""
@@ -81,19 +125,39 @@ sync_directories() {
 
     if [[ "$dry_run" == "true" ]]; then
         echo -e "  ${YELLOW}(dry-run) 복사될 디렉토리:${NC}"
-        find "$source_skills" -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
+        local found_skills=0
+        while IFS= read -r dir; do
             echo "    - $(basename "$dir")/"
-        done
+            found_skills=1
+        done < <(find "$source_skills" -mindepth 1 -maxdepth 1 -type d 2>&1) || {
+            echo -e "    ${RED}오류: 디렉토리 목록 조회 실패${NC}" >&2
+        }
+        if [[ $found_skills -eq 0 ]]; then
+            echo "    (복사할 skill 디렉토리 없음)"
+        fi
     else
-        mkdir -p "$dest_skills"
-        # 각 skill 디렉토리를 재귀적으로 복사
-        for skill_dir in "$source_skills"/*/; do
-            if [[ -d "$skill_dir" ]]; then
+        if ! mkdir -p "$dest_skills"; then
+            echo -e "${RED}오류:${NC} 디렉토리 생성 실패: $dest_skills" >&2
+            exit 1
+        fi
+
+        # nullglob으로 빈 glob 처리
+        shopt -s nullglob
+        local skill_dirs=("$source_skills"/*/)
+        shopt -u nullglob
+
+        if [[ ${#skill_dirs[@]} -eq 0 ]]; then
+            echo "  (복사할 skill 디렉토리 없음)"
+        else
+            for skill_dir in "${skill_dirs[@]}"; do
                 skill_name=$(basename "$skill_dir")
                 echo "  복사 중: $skill_name/"
-                cp -Rv "$skill_dir" "$dest_skills/" 2>/dev/null || true
-            fi
-        done
+                if ! cp -Rv "${skill_dir%/}" "$dest_skills/"; then
+                    echo -e "${RED}오류:${NC} skill 복사 실패: $skill_name" >&2
+                    exit 1
+                fi
+            done
+        fi
     fi
 
     echo ""
@@ -124,7 +188,7 @@ for arg in "$@"; do
             exit 0
             ;;
         *)
-            echo -e "${RED}알 수 없는 인자:${NC} $arg"
+            echo -e "${RED}알 수 없는 인자:${NC} $arg" >&2
             print_usage
             exit 1
             ;;
