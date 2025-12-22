@@ -58,8 +58,18 @@ check_directories() {
         exit 1
     fi
 
+    if [[ ! -r "$source_agents" ]] || [[ ! -x "$source_agents" ]]; then
+        echo -e "${RED}오류:${NC} $source_agents 디렉토리에 접근할 수 없습니다." >&2
+        exit 1
+    fi
+
     if [[ ! -d "$source_skills" ]]; then
         echo -e "${RED}오류:${NC} $source_skills 디렉토리가 없습니다." >&2
+        exit 1
+    fi
+
+    if [[ ! -r "$source_skills" ]] || [[ ! -x "$source_skills" ]]; then
+        echo -e "${RED}오류:${NC} $source_skills 디렉토리에 접근할 수 없습니다." >&2
         exit 1
     fi
 }
@@ -82,19 +92,32 @@ sync_directories() {
 
     if [[ "$dry_run" == "true" ]]; then
         echo -e "  ${YELLOW}(dry-run) 복사될 파일:${NC}"
+        local find_output
+        local find_status=0
+        find_output=$(find "$source_agents" -type f -name "*.md" 2>&1) || find_status=$?
+
+        if [[ $find_status -ne 0 ]]; then
+            echo -e "    ${RED}오류: 파일 목록 조회 실패${NC}" >&2
+            echo -e "    ${RED}상세: $find_output${NC}" >&2
+            exit 1
+        fi
+
         local found_agents=0
         while IFS= read -r file; do
-            echo "    - $(basename "$file")"
-            found_agents=1
-        done < <(find "$source_agents" -type f -name "*.md" 2>&1) || {
-            echo -e "    ${RED}오류: 파일 목록 조회 실패${NC}" >&2
-        }
+            [[ -n "$file" ]] && echo "    - $(basename "$file")" && found_agents=1
+        done <<< "$find_output"
+
         if [[ $found_agents -eq 0 ]]; then
             echo "    (복사할 .md 파일 없음)"
         fi
     else
         if ! mkdir -p "$dest_agents"; then
             echo -e "${RED}오류:${NC} 디렉토리 생성 실패: $dest_agents" >&2
+            exit 1
+        fi
+
+        if [[ ! -w "$dest_agents" ]]; then
+            echo -e "${RED}오류:${NC} 쓰기 권한 없음: $dest_agents" >&2
             exit 1
         fi
 
@@ -125,19 +148,32 @@ sync_directories() {
 
     if [[ "$dry_run" == "true" ]]; then
         echo -e "  ${YELLOW}(dry-run) 복사될 디렉토리:${NC}"
+        local find_skills_output
+        local find_skills_status=0
+        find_skills_output=$(find "$source_skills" -mindepth 1 -maxdepth 1 -type d 2>&1) || find_skills_status=$?
+
+        if [[ $find_skills_status -ne 0 ]]; then
+            echo -e "    ${RED}오류: 디렉토리 목록 조회 실패${NC}" >&2
+            echo -e "    ${RED}상세: $find_skills_output${NC}" >&2
+            exit 1
+        fi
+
         local found_skills=0
         while IFS= read -r dir; do
-            echo "    - $(basename "$dir")/"
-            found_skills=1
-        done < <(find "$source_skills" -mindepth 1 -maxdepth 1 -type d 2>&1) || {
-            echo -e "    ${RED}오류: 디렉토리 목록 조회 실패${NC}" >&2
-        }
+            [[ -n "$dir" ]] && echo "    - $(basename "$dir")/" && found_skills=1
+        done <<< "$find_skills_output"
+
         if [[ $found_skills -eq 0 ]]; then
             echo "    (복사할 skill 디렉토리 없음)"
         fi
     else
         if ! mkdir -p "$dest_skills"; then
             echo -e "${RED}오류:${NC} 디렉토리 생성 실패: $dest_skills" >&2
+            exit 1
+        fi
+
+        if [[ ! -w "$dest_skills" ]]; then
+            echo -e "${RED}오류:${NC} 쓰기 권한 없음: $dest_skills" >&2
             exit 1
         fi
 
