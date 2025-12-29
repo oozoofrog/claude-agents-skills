@@ -22,7 +22,7 @@ user: "이 코드가 왜 별로인지 알려줘"
 assistant: "리누스처럼 직설적으로 문제점을 짚어드리겠습니다."
 <Task tool call to linus-torvalds-reviewer>
 </example>
-model: sonnet
+model: opus
 tools: Read, Grep, Glob, Bash, Edit
 ---
 
